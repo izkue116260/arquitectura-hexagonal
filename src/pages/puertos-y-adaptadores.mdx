@@ -1,0 +1,253 @@
+---
+layout: ../layouts/Base.astro
+title: Puertos y adaptadores
+---
+
+# 3. Puertos y adaptadores
+
+En el capítulo anterior vimos las tres zonas. Ahora vamos a ver **cómo se conectan entre sí**. Esa conexión se hace con dos piezas: los **puertos** y los **adaptadores**.
+
+Lo vamos a ir construyendo paso a paso con la lista de tareas.
+
+## La idea, con un ejemplo de la vida real
+
+Piensa en tu móvil y en su cargador.
+
+- Tu móvil tiene un agujero USB-C. **No le importa** si lo cargas en casa, en el coche o con el ordenador.
+- Lo único que exige es que el cargador **encaje en ese agujero**.
+
+| En la vida real | En nuestro código |
+|---|---|
+| El móvil | El caso de uso `agregarTarea` |
+| El agujero USB-C (el "estándar") | El **puerto** |
+| El cargador de casa, el del coche... | Los **adaptadores** (`localStorage`, API...) |
+
+El móvil no se entera de qué cargador usas. Nuestro caso de uso tampoco debe enterarse de dónde se guardan las tareas.
+
+## El problema que queremos resolver
+
+Nuestro caso de uso necesita guardar y leer tareas. La forma más directa sería esta:
+
+```ts
+// aplicacion/agregarTarea.ts  (versión SIN puerto)
+export async function agregarTarea(titulo: string) {
+  const tareas = JSON.parse(localStorage.getItem('tareas') ?? '[]');
+
+  if (!puedeAgregarTarea(titulo, tareas.length)) {
+    throw new Error('No se puede agregar la tarea');
+  }
+
+  localStorage.setItem('tareas', JSON.stringify([...tareas, titulo]));
+}
+```
+
+Funciona, pero fíjate: el caso de uso **sabe que existe `localStorage`**. Es como un móvil con el cargador de casa soldado dentro. Si mañana quieres guardar en un servidor, tienes que abrir y modificar `agregarTarea`.
+
+Vamos a arreglarlo.
+
+## Paso 1: crear el puerto
+
+Un puerto es una **`interface`** de TypeScript. Una `interface` es simplemente una lista de lo que algo **tiene que saber hacer**, sin decir cómo.
+
+Un ejemplo muy simple, sin tareas, para entender qué es una `interface`:
+
+```ts
+interface Saludador {
+  saludar(nombre: string): string;
+}
+```
+
+Esto dice: *"cualquier cosa que sea un `Saludador` tiene que tener una función `saludar` que recibe un nombre y devuelve un texto"*. No dice qué saluda. Puede ser en español, en inglés o en euskera.
+
+Nuestro puerto funciona igual:
+
+```ts
+// aplicacion/TareaRepository.ts
+export interface TareaRepository {
+  obtenerTodas(): Promise<string[]>;
+  guardar(tareas: string[]): Promise<void>;
+}
+```
+
+Léelo así:
+
+- `obtenerTodas()`: *"tiene que saber devolverme las tareas"*. Devuelve una `Promise` de lista de textos.
+- `guardar(tareas)`: *"tiene que saber guardar esta lista de tareas"*. No devuelve nada.
+
+> ¿Por qué `Promise`? Porque guardar y leer datos puede tardar (por ejemplo, si hay que preguntar a un servidor). Con `Promise` el puerto vale tanto para algo instantáneo como `localStorage` como para algo lento como una API. Si no lo hiciéramos así, tendríamos que cambiar el puerto el día que usemos un servidor.
+
+Fíjate en lo que **no** aparece: ni `localStorage`, ni `fetch`, ni `React`. Es solo la descripción de lo que hace falta.
+
+## Paso 2: usar el puerto en el caso de uso
+
+Ahora `agregarTarea` ya no habla con `localStorage`. Pide **el repositorio como parámetro** y le habla a través del puerto:
+
+```ts
+// aplicacion/agregarTarea.ts  (versión CON puerto)
+export async function agregarTarea(repo: TareaRepository, titulo: string) {
+  const tareas = await repo.obtenerTodas();
+
+  if (!puedeAgregarTarea(titulo, tareas.length)) {
+    throw new Error('No se puede agregar la tarea');
+  }
+
+  await repo.guardar([...tareas, titulo]);
+}
+```
+
+Compara con la versión anterior:
+
+| Antes | Ahora |
+|---|---|
+| `JSON.parse(localStorage.getItem(...))` | `await repo.obtenerTodas()` |
+| `localStorage.setItem(...)` | `await repo.guardar(...)` |
+
+Las reglas y el orden de los pasos son **exactamente los mismos**. Solo ha cambiado quién guarda y lee: ahora es "alguien que cumple el puerto".
+
+> **¿Por qué el puerto se llama `TareaRepository`?** "Repositorio" es el nombre habitual para algo que **guarda y lee un tipo de dato**. Es como un archivador: le dices "guarda esto" o "dame las tareas", y no te importa si por dentro es un cajón, un armario o un almacén. `TareaRepository` es, simplemente, el archivador de tareas.
+
+## Paso 3: crear un adaptador
+
+Alguien tiene que hacer el trabajo de verdad. Ese es el **adaptador**: un objeto que **cumple el puerto** usando algo concreto.
+
+```ts
+// adaptadores/localStorageTareaRepository.ts
+export const localStorageTareaRepository: TareaRepository = {
+  async obtenerTodas() {
+    return JSON.parse(localStorage.getItem('tareas') ?? '[]');
+  },
+  async guardar(tareas) {
+    localStorage.setItem('tareas', JSON.stringify(tareas));
+  },
+};
+```
+
+Vamos a leerlo con calma:
+
+- `: TareaRepository` le dice a TypeScript: *"este objeto tiene que cumplir el puerto"*. Si se te olvida una función, o tiene una forma distinta, TypeScript te avisa con un error. **Eso es lo que garantiza que el enchufe encaje.**
+- `localStorage.getItem('tareas') ?? '[]'` lee del navegador. Si no hay nada guardado, usa una lista vacía.
+- `JSON.parse` / `JSON.stringify` convierten entre texto y lista, porque `localStorage` solo guarda texto.
+- Las funciones son `async` solo para cumplir el puerto, que promete devolver `Promise`.
+
+## Paso 4: un segundo adaptador, para el mismo puerto
+
+Aquí se ve la ventaja. Creamos otro adaptador que guarda en un servidor:
+
+```ts
+// adaptadores/apiTareaRepository.ts
+export const apiTareaRepository: TareaRepository = {
+  async obtenerTodas() {
+    const respuesta = await fetch('/api/tareas');
+    return respuesta.json();
+  },
+  async guardar(tareas) {
+    await fetch('/api/tareas', {
+      method: 'PUT',
+      body: JSON.stringify(tareas),
+    });
+  },
+};
+```
+
+Por dentro es muy distinto (usa `fetch`), pero **por fuera tiene exactamente la misma forma**: `obtenerTodas` y `guardar`. Por eso `agregarTarea` funciona con cualquiera de los dos sin enterarse.
+
+## Paso 5: conectarlo todo
+
+¿Dónde se elige qué adaptador se usa? En el sitio que **llama** al caso de uso. En nuestro caso, el componente de React:
+
+```tsx
+// adaptadores/ListaTareas.tsx
+import { agregarTarea } from '../aplicacion/agregarTarea';
+import { localStorageTareaRepository } from './localStorageTareaRepository';
+
+function ListaTareas() {
+  const [titulo, setTitulo] = useState('');
+
+  async function onAgregar() {
+    await agregarTarea(localStorageTareaRepository, titulo);
+    setTitulo('');
+  }
+
+  return (
+    <div>
+      <input value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+      <button onClick={onAgregar}>Agregar</button>
+    </div>
+  );
+}
+```
+
+Para pasar de `localStorage` a la API, cambias **dos líneas** en este fichero: el `import` y el argumento.
+
+```tsx
+import { apiTareaRepository } from './apiTareaRepository';
+// ...
+await agregarTarea(apiTareaRepository, titulo);
+```
+
+Las reglas (`puedeAgregarTarea`) y el caso de uso (`agregarTarea`) **no se tocan**. Esa es la ventaja de todo este trabajo.
+
+> En apps más grandes se suele elegir el adaptador en **un solo sitio** para toda la app, en vez de en cada componente. Eso se verá más adelante. De momento basta con entender la idea.
+
+## Entonces, React también es un adaptador
+
+Fíjate en que el componente `ListaTareas` también está "en el borde": traduce lo que hace el usuario (un clic) en una llamada al caso de uso. Por eso es un adaptador, pero de otro tipo.
+
+| Tipo | Quién lo usa | Ejemplo |
+|---|---|---|
+| **De entrada** | Quien **empieza** la acción: llama al caso de uso | React (`ListaTareas`) |
+| **De salida** | El caso de uso lo llama cuando necesita algo de fuera | `localStorageTareaRepository`, `apiTareaRepository` |
+
+Casi siempre, cuando se habla de "puertos", se habla de los de salida (los repositorios). Los de entrada son simplemente los casos de uso: son lo que React llama.
+
+Por eso en el [dibujo del hexágono](/hexagono#esquema-hexagono), React está a un lado y `localStorage` al otro.
+
+## Errores típicos al empezar
+
+**1. Ponerle al puerto un nombre de la tecnología**
+
+```ts
+// Mal: el puerto sabe que existe localStorage
+interface TareaRepository {
+  leerDeLocalStorage(): string[];
+}
+
+// Bien: dice QUÉ se hace, no CÓMO
+interface TareaRepository {
+  obtenerTodas(): Promise<string[]>;
+}
+```
+
+Si el nombre del puerto menciona la tecnología, ya no puedes cambiar de tecnología sin cambiar el puerto.
+
+**2. Meter reglas en el adaptador**
+
+```ts
+// Mal: el límite de 5 está escondido en el adaptador
+async guardar(tareas) {
+  if (tareas.length > 5) return;
+  localStorage.setItem('tareas', JSON.stringify(tareas));
+}
+```
+
+Un adaptador solo **guarda y lee**. Las reglas van siempre en el dominio. Si no, tendrías que repetir el `if` en cada adaptador.
+
+**3. Un puerto gigante**
+
+Si el puerto tiene 15 funciones, algo va mal. Mantén los puertos pequeños y centrados en una sola cosa (tareas, usuarios, pagos...).
+
+**4. Crear un puerto para todo**
+
+No hace falta un puerto por cada función. Solo para lo que es **externo y puede cambiar**: guardado de datos, llamadas a APIs, envío de emails... Las reglas puras, como `puedeAgregarTarea`, no necesitan puerto.
+
+## Resumen
+
+1. El **puerto** es una `interface` que dice **qué** hace falta.
+2. El **caso de uso** recibe algo que cumple el puerto y solo habla con él.
+3. El **adaptador** cumple el puerto usando algo concreto: `localStorage`, una API...
+4. **Cambiar de adaptador** es cambiar un par de líneas. No se tocan ni las reglas ni el caso de uso.
+5. **React** es también un adaptador, de entrada: traduce el clic en una llamada al caso de uso.
+
+> **Truco para recordarlo:** puerto = enchufe, adaptador = aparato que se enchufa, caso de uso = el que usa la electricidad sin saber de dónde viene.
+
+Siguiente: [cómo esto facilita los tests](/testing).

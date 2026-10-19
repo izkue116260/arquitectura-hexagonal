@@ -1,0 +1,15 @@
+---
+layout: ../layouts/Base.astro
+title: Glosario
+---
+
+# Glosario
+- **Arquitectura hexagonal**: Forma de organizar el código en zonas (dominio, aplicación, adaptadores) para que cada parte se pueda cambiar sin romper las demás.
+- **Dominio**: Las reglas de tu aplicación ("máximo 5 tareas"). Código sin React ni acceso a datos.
+- **Caso de uso (aplicación)**: Algo que el usuario puede hacer: "agregar una tarea". Combina las reglas del dominio con los puertos.
+- **Puerto**: Una `interface` que describe lo que se necesita sin decir cómo se hace. Es el "enchufe".
+- **Adaptador**: Código que cumple un puerto usando algo concreto: `localStorage`, una API, React. Es el "aparato" que se enchufa.
+- **Repositorio**: Un puerto típico para obtener y guardar datos. No sabe dónde se guardan.
+- **Acoplado**: Código que depende tanto de otro que no puedes cambiar uno sin tocar el otro.
+- **Mock / adaptador en memoria**: Una versión "de mentira" de un adaptador, para usar en tests.
+- **Interface**: En TypeScript, la descripción de la forma que debe tener un objeto.

@@ -1,0 +1,74 @@
+---
+layout: ../layouts/Base.astro
+title: Tests
+---
+
+# 4. Tests sin dolor
+
+Esta es la gran ventaja: puedes probar las reglas **sin React, sin navegador y sin servidor**.
+
+## Probar el dominio
+
+Es una función normal. Entra algo, sale algo:
+
+```ts
+import { puedeAgregarTarea } from './tarea';
+
+test('no deja agregar una tarea vacía', () => {
+  expect(puedeAgregarTarea('   ', 0)).toBe(false);
+});
+
+test('no deja pasar de 5 tareas', () => {
+  expect(puedeAgregarTarea('Comprar pan', 5)).toBe(false);
+});
+
+test('deja agregar si hay hueco', () => {
+  expect(puedeAgregarTarea('Comprar pan', 2)).toBe(true);
+});
+```
+
+Compara con la versión del [primer capítulo](/problema): allí habría que renderizar el componente y hacer clic en botones.
+
+## Probar el caso de uso con un adaptador "de mentira"
+
+Creamos un repositorio que guarda en una variable. Cumple el mismo puerto, así que el caso de uso no nota la diferencia:
+
+```ts
+function crearRepositorioEnMemoria(inicial: string[] = []): TareaRepository {
+  let tareas = inicial;
+  return {
+    async obtenerTodas() {
+      return tareas;
+    },
+    async guardar(nuevas) {
+      tareas = nuevas;
+    },
+  };
+}
+
+test('agrega una tarea', async () => {
+  const repo = crearRepositorioEnMemoria();
+
+  await agregarTarea(repo, 'Comprar pan');
+
+  expect(await repo.obtenerTodas()).toEqual(['Comprar pan']);
+});
+
+test('falla si ya hay 5 tareas', async () => {
+  const repo = crearRepositorioEnMemoria(['1', '2', '3', '4', '5']);
+
+  await expect(agregarTarea(repo, 'Una más')).rejects.toThrow();
+});
+```
+
+Sin `localStorage`, sin `fetch`, sin mocks complicados. Los tests son rápidos y fáciles de leer.
+
+> Esa es la recompensa de separar bien las zonas: lo importante (las reglas) se prueba de forma sencilla.
+
+## ¿Y cuándo NO hace falta todo esto?
+
+Si tu app es muy pequeña y las reglas son casi inexistentes (por ejemplo, solo muestra datos), esta estructura puede ser **más trabajo que beneficio**. Úsala cuando tengas reglas de negocio que quieras proteger y probar.
+
+## Ya lo tienes
+
+Has terminado la parte de teoría. Comprueba lo que has aprendido en las [preguntas](/preguntas).

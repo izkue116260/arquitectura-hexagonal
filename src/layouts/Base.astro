@@ -1,0 +1,154 @@
+---
+interface Props {
+  title?: string;
+}
+
+const title = Astro.props.title ?? Astro.props.frontmatter?.title ?? 'Inicio';
+const pathname = Astro.url.pathname.replace(/\/$/, '') || '/';
+
+const links = [
+  { href: '/problema', label: 'El problema', step: '1' },
+  { href: '/hexagono', label: 'El hexágono', step: '2' },
+  { href: '/puertos-y-adaptadores', label: 'Puertos y adaptadores', step: '3' },
+  { href: '/testing', label: 'Tests', step: '4' },
+  { href: '/preguntas', label: 'Preguntas', step: '5' },
+  { href: '/glosario', label: 'Glosario' },
+];
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>{title} · Arquitectura hexagonal</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="site-header__inner">
+        <a class="brand" href="/">
+          <span class="brand__logo" aria-hidden="true">⬡</span>
+          Arquitectura hexagonal
+        </a>
+        <nav aria-label="Capítulos">
+          <ul>
+            {
+              links.map((link) => (
+                <li>
+                  <a href={link.href} aria-current={pathname === link.href ? 'page' : undefined}>
+                    {link.step && <span class="step">{link.step}</span>}
+                    {link.label}
+                  </a>
+                </li>
+              ))
+            }
+          </ul>
+        </nav>
+      </div>
+    </header>
+    <main><slot /></main>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    --fg: #1c1c1e;
+    --bg: #fafaf7;
+    --accent: #3b5bdb;
+    --domain: #f08c00;
+    --app: #2f9e44;
+    --adapter: #3b5bdb;
+    --border: #8884;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fg: #ececec;
+      --bg: #16161a;
+      --accent: #7c93ff;
+    }
+  }
+  body {
+    margin: 0;
+    font-family: system-ui, sans-serif;
+    line-height: 1.6;
+    color: var(--fg);
+    background: var(--bg);
+  }
+  main,
+  footer {
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: 1rem;
+  }
+  a { color: var(--accent); }
+  blockquote { margin: 1rem 0; padding: .5rem 1rem; border-left: 4px solid var(--accent); background: #3b5bdb14; }
+  pre { padding: 1rem; overflow-x: auto; border-radius: 6px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid var(--border); padding: .4rem .6rem; text-align: left; }
+
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: color-mix(in srgb, var(--bg) 90%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .site-header__inner {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: .6rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-weight: 700;
+    text-decoration: none;
+    color: var(--fg);
+  }
+  .brand__logo { color: var(--domain); font-size: 1.4rem; }
+  .site-header ul {
+    display: flex;
+    gap: .25rem;
+    margin: 0;
+    padding: 0 0 .25rem;
+    list-style: none;
+    overflow-x: auto;
+  }
+  .site-header nav a {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .3rem .7rem;
+    border-radius: 999px;
+    white-space: nowrap;
+    text-decoration: none;
+    color: var(--fg);
+  }
+  .site-header nav a:hover { background: #8882; }
+  .site-header nav a[aria-current='page'] {
+    background: var(--accent);
+    color: #fff;
+  }
+  .site-header .step {
+    display: inline-grid;
+    place-items: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 50%;
+    border: 1px solid currentColor;
+    font-size: .75rem;
+  }
+  @media (min-width: 52rem) {
+    .site-header__inner {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .site-header ul { padding: 0; }
+  }
+</style>

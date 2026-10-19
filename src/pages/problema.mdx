@@ -1,0 +1,66 @@
+---
+layout: ../layouts/Base.astro
+title: El problema
+---
+
+# 1. El problema
+
+Imagina una lista de tareas con dos reglas:
+
+- No se puede añadir una tarea **vacía**.
+- No puede haber **más de 5 tareas**.
+
+## La primera versión que todos escribimos
+
+Todo dentro del componente:
+
+```tsx
+function ListaTareas() {
+  const [tareas, setTareas] = useState<string[]>([]);
+  const [titulo, setTitulo] = useState('');
+
+  function agregar() {
+    // Regla 1 y 2 mezcladas con la UI
+    if (titulo.trim() === '' || tareas.length >= 5) return;
+
+    const nuevas = [...tareas, titulo];
+    setTareas(nuevas);
+    localStorage.setItem('tareas', JSON.stringify(nuevas)); // guardado
+    setTitulo('');
+  }
+
+  return (
+    <div>
+      <input value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+      <button onClick={agregar}>Agregar</button>
+      <ul>
+        {tareas.map((tarea) => (
+          <li key={tarea}>{tarea}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+Funciona. Pero este componente hace **tres cosas a la vez**:
+
+1. Pinta la pantalla (React).
+2. Decide las reglas ("máximo 5", "no vacías").
+3. Guarda los datos (`localStorage`).
+
+## ¿Por qué duele?
+
+> Piensa en una **multirregleta** donde todo está soldado: la lámpara, el cargador y la tele. Si se rompe una cosa, tienes que abrirlo todo.
+
+Estos problemas aparecen enseguida:
+
+- **Probar la regla es incómodo.** Para comprobar que "no se pasa de 5" tienes que renderizar el componente y simular clics.
+- **Cambiar el guardado es arriesgado.** Si mañana los datos vienen de un servidor en vez de `localStorage`, tocas el componente entero.
+- **No puedes reutilizar la regla.** Si otra pantalla también añade tareas, copias y pegas el `if`.
+
+## La idea de la arquitectura hexagonal
+
+Separar el código en zonas, para que **cada cosa se pueda cambiar sin tocar las demás**.
+
+Eso es todo. Lo demás son nombres para esas zonas. Las vemos en el [siguiente capítulo](/hexagono).

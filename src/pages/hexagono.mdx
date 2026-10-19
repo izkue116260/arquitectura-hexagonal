@@ -1,0 +1,61 @@
+---
+layout: ../layouts/Base.astro
+title: El hexágono
+---
+
+import { HexagonDiagram } from '../components/HexagonDiagram.tsx';
+import HexagonSvg from '../components/HexagonSvg.astro';
+
+# 2. El hexágono
+
+Dividimos el código en **tres zonas**: dominio, aplicación y adaptadores. Así se ven juntas:
+
+<HexagonSvg />
+
+Ahora pulsa en cada zona para ver un ejemplo real de nuestra lista de tareas:
+
+<HexagonDiagram client:load />
+
+## Una analogía: el restaurante
+
+| Zona | En el restaurante | En nuestra app |
+|---|---|---|
+| **Dominio** | El reglamento ("no se sirve alcohol a menores") | `puedeAgregarTarea` |
+| **Aplicación** | El camarero que toma el pedido y sigue el reglamento | `agregarTarea` |
+| **Adaptadores** | La carta, la cocina, la caja registradora | React, `localStorage` |
+
+El reglamento no cambia aunque cambies la carta o la cocina.
+
+## La regla más importante
+
+> **Las zonas de dentro no conocen a las de fuera.**
+> El dominio no sabe qué es React. La aplicación no sabe si guardas en `localStorage` o en un servidor.
+
+Dicho al revés: **los adaptadores conocen a la aplicación, pero la aplicación no conoce a los adaptadores**.
+
+```
+   Adaptadores (React, localStorage, API)
+        │  conocen a
+        ▼
+   Aplicación (casos de uso)
+        │  conoce a
+        ▼
+   Dominio (reglas)
+```
+
+La flecha siempre apunta **hacia dentro**. Si alguna vez ves que el dominio importa algo de `react`, algo ha ido mal.
+
+## Cómo se ve en carpetas
+
+```
+src/
+├── dominio/
+│   └── tarea.ts
+├── aplicacion/
+│   └── agregarTarea.ts
+└── adaptadores/
+    ├── localStorageTareaRepository.ts
+    └── ListaTareas.tsx      ← el componente de React
+```
+
+Siguiente: [puertos y adaptadores](/puertos-y-adaptadores), la pieza que une las zonas.
